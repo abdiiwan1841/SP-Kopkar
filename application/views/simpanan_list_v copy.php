@@ -418,7 +418,6 @@ function save() {
 
 function update(){
 	var row = jQuery('#dg').datagrid('getSelected');
-	// var row =('');
 	if(row){
 		jQuery('#dialog-form').dialog('open').dialog('setTitle','Edit Data Setoran');
 		jQuery('#form').form('load',row);

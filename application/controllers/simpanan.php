@@ -12,6 +12,7 @@ class Simpanan extends OperatorController {
 		$this->data['judul_browser'] = 'Transaksi';
 		$this->data['judul_utama'] = 'Transaksi';
 		$this->data['judul_sub'] = 'Setoran Tunai';
+		
 
 		$this->data['css_files'][] = base_url() . 'assets/easyui/themes/default/easyui.css';
 		$this->data['css_files'][] = base_url() . 'assets/easyui/themes/icon.css';
@@ -75,6 +76,17 @@ class Simpanan extends OperatorController {
 		exit();
 	}
 
+	function get_autocomplete(){
+        if (isset($_GET['term'])) {
+            $result = $this->simpanan_m->dataAnggota($_GET['term']);
+            if (count($result) > 0) {
+            foreach ($result as $row)
+                $arr_result[] = $row->nama;
+                echo json_encode($arr_result);
+            }
+        }
+    }
+
 	function ajax_list() {
 		/*Default request pager params dari jeasyUI*/
 		$offset = isset($_POST['page']) ? intval($_POST['page']) : 1;
@@ -102,6 +114,7 @@ class Simpanan extends OperatorController {
 			//array keys ini = attribute 'field' di view nya
 			$anggota = $this->general_m->get_data_anggota($r->anggota_id);  
 			$nama_simpanan = $this->general_m->get_jns_simpanan($r->jenis_id);  
+			
 
 			$rows[$i]['id'] = $r->id;
 			$rows[$i]['id_txt'] ='TRD' . sprintf('%05d', $r->id) . '';
@@ -121,13 +134,108 @@ class Simpanan extends OperatorController {
 			$rows[$i]['nama_penyetor'] = $r->nama_penyetor;
 			$rows[$i]['no_identitas'] = $r->no_identitas;
 			$rows[$i]['alamat'] = $r->alamat;
-			$rows[$i]['nota'] = '<p></p><p>
-			<a href="'.site_url('cetak_simpanan').'/cetak/' . $r->id . '"  title="Cetak Bukti Transaksi" target="_blank"> <i class="glyphicon glyphicon-print"></i> Nota </a></p>';
+			if($r->itPostSp == 0){
+				$rows[$i]['nota'] = '
+			<a href="'.site_url('cetak_simpanan').'/cetak/' . $r->id . '"  title="Cetak Bukti Transaksi" target="_blank"> <i class="glyphicon glyphicon-print"></i> </a>
+			<a href="'.site_url('simpanan/postingSetoranTunai').'/'. $r->id . '"  title="Posting" <i class="fa fa-share"></i> </a>
+			<a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" plain="true" onclick="update()">Edit</a>
+		<a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" plain="true" onclick="hapus()">Hapus</a>';
+			}else{
+				$rows[$i]['nota'] = '
+				<a href="'.site_url('cetak_simpanan').'/cetak/' . $r->id . '"  title="Cetak Bukti Transaksi" target="_blank"> <i class="glyphicon glyphicon-print"></i> </a>
+				<a href="'.site_url('simpanan/unpostingSetoran').'/'. $r->id . '"  title="Posting" <i class="fa fa-reply"></i> </a>';		
+			}
+			
 			$i++;
 		}
 		//keys total & rows wajib bagi jEasyUI
 		$result = array('total'=>$data['count'],'rows'=>$rows);
 		echo json_encode($result); //return nya json
+	}
+
+	public function postingSetoranTunai($id){
+		$data = array(
+			'itPostSp' => '1',
+		);
+		$dataSimpanan 	= $this->simpanan_m->getDataSimpananById($id)->row();
+		$relSimpanan 		= $this->simpanan_m->getJenisSimpanan($dataSimpanan->jenis_id)->result();
+		$relKas 		= $this->simpanan_m->getKasId($dataSimpanan->kas_id)->result();
+		
+		$this->db->trans_start();
+
+		foreach ($relSimpanan as $item) {
+			$item = array(
+		
+			// 'vcIDJournal' 		=> 'TRD-'. $dataSimpanan->id,
+			'vcIDJournal' 		=> $dataSimpanan->id,
+			'dtJournal'			=> $dataSimpanan->tgl_transaksi,
+			'vcJournalDesc'		=> 'Setoran Tunai',
+			'vcCOAJournal'		=> $item->vcCOACode,
+			'cuJournalCredit' 	=> $dataSimpanan->jumlah,
+			// 'cuJournalDebet'	=> $dataSimpanan->jumlah,
+			'itPostJournal'		=> '1',
+			'vcUserID'			=> 'admin',
+		);
+	};
+
+	foreach ($relKas as $kas) {
+		$kas = array(
+			// 'vcIDJournal' 		=> 'TRD-'. $dataSimpanan->id,
+			'vcIDJournal' 		=> $dataSimpanan->id,
+			'dtJournal'			=> $dataSimpanan->tgl_transaksi,
+			'vcJournalDesc'		=> 'Setoran Tunai',
+			'vcCOAJournal'		=> $kas->vcCOACode,
+			// 'cuJournalCredit' 	=> $dataSimpanan->jumlah,
+			'cuJournalDebet'	=> $dataSimpanan->jumlah,
+			'itPostJournal'		=> '1',
+			'vcUserID'			=> 'admin',
+
+		);
+	};
+		$this->db->insert('tbl_journal', $item);
+		$this->db->insert('tbl_journal', $kas);
+	
+		// update tbl_arheader
+		$this->simpanan_m->updateSimpananById($id, $data);
+
+		if ($this->db->trans_status() === FALSE) {
+			$this->db->trans_rollback();
+			$this->session->set_flashdata('error','Mohon maaf data gagal diposting.');
+			redirect_back();
+			return FALSE;
+		} else {
+			$this->db->trans_complete();
+			$this->session->set_flashdata('sukses','Selamat, Data berhasil diposting.');
+			redirect_back();
+			return TRUE;
+		}
+	}
+
+	public function unpostingSetoran($id){
+		$data = array(
+			'itPostSp' => '0',
+		);
+		// ambil data by IDHeader
+		$dataSimpanan 	= $this->simpanan_m->getDataSimpananById($id)->row();
+
+		$this->db->trans_start();
+		//delete tabel row ditabel jurnal
+		$this->db->where('vcIDJournal', $dataSimpanan->id);
+		$this->db->delete('tbl_journal');
+		// update tabel tbl_arheader
+		$this->simpanan_m->updateSimpananById($id, $data);
+
+		if ($this->db->trans_status() === FALSE) {
+			$this->db->trans_rollback();
+			$this->session->set_flashdata('error','Mohon maaf data gagal diposting.');
+			redirect_back();
+			return FALSE;
+		} else {
+			$this->db->trans_complete();
+			$this->session->set_flashdata('sukses','Selamat, Data berhasil diposting.');
+			redirect_back();
+			return TRUE;
+		}
 	}
 
 	function get_jenis_simpanan() {

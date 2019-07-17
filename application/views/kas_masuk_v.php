@@ -14,6 +14,7 @@ $txt_tanggal .= ' - ' . $tanggal_arr[1];
 // print_r($data_ar_header);
 // echo '</pre>';
 ?>
+s
 
 <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#tambah" >Tambah</button>
 <div style="padding: 25px;">
