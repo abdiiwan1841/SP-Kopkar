@@ -87,6 +87,13 @@ class Simpanan_m extends CI_Model {
 		}
 	}
 
+	function dataAnggota($id){
+        $this->db->like('nama', $id , 'both');
+        $this->db->order_by('nama', 'ASC');
+        $this->db->limit(10);
+        return $this->db->get('tbl_anggota')->result();
+    }
+
 	//panggil data jenis simpan
 	function get_jenis_simpan($id) {
 		$this->db->select('*');
@@ -192,5 +199,61 @@ class Simpanan_m extends CI_Model {
 
 	public function delete($id) {
 		return $this->db->delete('tbl_trans_sp', array('id' => $id)); 
+	}
+
+
+	// FROM FERRY
+
+	public function getDataSimpananById($id){
+		$this->db->limit('1');
+		$this->db->where('id', $id);
+		return $this->db->get('tbl_trans_sp');
+	}
+
+	//update ar header by id
+	public function updateSimpananById($id, $data){
+		$this->db->where('id', $id);
+		$this->db->update('tbl_trans_sp', $data);
+		return TRUE;
+	}
+
+	public function getJenisSimpanan($jenis_id)
+	{
+		$this->db->select('*');
+		$this->db->from('jns_simpan s');
+		$this->db->join('tbl_trans_sp a', 'a.jenis_id = s.id', 'LEFT');
+		$this->db->where('s.id', $jenis_id);
+		return $this->db->get('tbl_trans_sp');
+	}
+
+	public function getKasId($kas_id)
+	{
+		$this->db->select('*');
+		$this->db->from('nama_kas_tbl s');
+		$this->db->join('tbl_trans_sp a', 'a.jenis_id = s.id', 'LEFT');
+		$this->db->where('s.id', $kas_id);
+		return $this->db->get('tbl_trans_sp');
+	}
+
+	public function getJenisSimpanan1($jenis_id){
+		$this->db->join('tbl_trans_sp C','C.jenis_id = H.id','LEFT');
+		$this->db->where('H.id', $jenis_id);
+		$this->db->order_by('H.IDItem','DESC');
+		return $this->db->get('jns_simpan H');
+	}
+
+	public function getKas($id)
+	{
+		$this->db->select('*');
+		$this->db->from('nama_kas_tbl s');
+		$this->db->join('tbl_trans_sp a', 'a.kas_id = s.id', 'LEFT');
+		$this->db->where('s.id', $id);
+		return $this->db->get('tbl_trans_sp');
+	}
+
+	public function updateTabelSimpanan($id, $data){
+		$this->db->where('id', $id);
+		$this->db->update('tbl_trans_sp', $data);
+		return TRUE;
 	}
 }
